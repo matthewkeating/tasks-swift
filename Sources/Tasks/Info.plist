@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Tasks</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.mattkeating.tasks</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleExecutable</key>
+    <string>Tasks</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <!--
+    OAuth client ID from Google Cloud Console (https://console.cloud.google.com).
+    Replace with your own GIDClientID if forking this project.
+    -->
+    <key>GIDClientID</key>
+    <string>628950820541-qu26hhf2gd38v5go4m63pqbo6afn5t4t.apps.googleusercontent.com</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <!-- 
+      Reversed form of GIDClientID above.
+      Required for the OAuth redirect URI.
+      Replace with your own GIDClientID if forking this project.
+      -->
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>GoogleSignIn</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.628950820541-qu26hhf2gd38v5go4m63pqbo6afn5t4t</string>
+        </array>
+      </dict>
+    </array>
+</dict>
+</plist>
