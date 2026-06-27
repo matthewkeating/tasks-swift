@@ -55,30 +55,42 @@ struct TaskFormView: View {
         // centre alignment). This gives the form a standard left-anchored layout.
         VStack(alignment: .leading, spacing: 20) {
 
-            // Ternary operator: `condition ? valueIfTrue : valueIfFalse`.
-            // The title changes dynamically based on which mode the form is in.
-            Text(isEditing ? "Edit Task" : "New Task")
-                .font(.title2.bold())
-
             // A nested VStack groups the label and input field together with
             // tighter spacing (6pt) than the outer VStack (20pt).
             VStack(alignment: .leading, spacing: 6) {
-                Text("Title").font(.headline)
 
                 // `TextField` is a single-line text input.
                 // The first argument is placeholder text shown when the field is empty.
                 // `text: $title` is a two-way binding — changes the user makes in the
                 // field are automatically written back to `title`, and changes to
                 // `title` in code are reflected in the field.
-                TextField("Task title", text: $title)
-                    // `.roundedBorder` applies the standard rounded-rectangle
-                    // text field appearance used across macOS and iOS.
-                    .textFieldStyle(.roundedBorder)
+                TextField("Title", text: $title)
+                    // `.title2` is a larger system text style; `.bold()` weights it.
+                    // Using a semantic style (rather than a fixed point size) keeps
+                    // the field in step with the user's Dynamic Type settings.
+                    .font(.title2)
+                    .bold()
+                    // `.plain` removes the default rounded border and background,
+                    // leaving just the text. `.padding(6)` restores the inset the
+                    // border used to provide so text isn't flush to the edge.
+                    .textFieldStyle(.plain)
+                    .padding(6)
+                    // Draw a 1pt border only while this field has focus. When it
+                    // doesn't, we stroke with `.clear` so the layout stays identical
+                    // (no jump) but nothing is visible. `Color.accentColor` is the
+                    // system accent — the same colour used for selected list rows
+                    // and the prominent Return-key button.
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(
+                                focusedField == .title ? Color.accentColor : .clear,
+                                lineWidth: 1
+                            )
+                    )
                     .focused($focusedField, equals: .title)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Notes").font(.headline)
 
                 // `TextEditor` is a multi-line text input, unlike `TextField`.
                 // It also uses a two-way binding via `$notes`.
@@ -86,12 +98,30 @@ struct TaskFormView: View {
                     .font(.body)
                     // `.frame(height: 80)` fixes the editor's height so it doesn't
                     // grow unbounded as the user types.
-                    .frame(height: 80)
-                    // `.overlay` draws a view on top of this view without affecting
-                    // layout. Here it adds a rounded border, mimicking the appearance
-                    // of `.roundedBorder` text fields (which TextEditor doesn't support).
-                    // `.stroke(.separator)` uses the system separator colour for the border.
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+                    .frame(height: 200)
+                    // TextEditor has no built-in placeholder (unlike TextField), so
+                    // we fake one by overlaying a Text that's shown only while `notes`
+                    // is empty. `alignment: .topLeading` sits it where typed text begins.
+                    .overlay(alignment: .topLeading) {
+                        if notes.isEmpty {
+                            Text("Notes...")
+                                .font(.body)
+                                // `.placeholder` is the system placeholder colour,
+                                // matching the greyed-out hint in TextFields.
+                                .foregroundStyle(.placeholder)
+                                // These insets line the placeholder up with where
+                                // TextEditor actually draws its text (slightly inset
+                                // from the frame); nudge if it doesn't align exactly.
+                                .padding(.top, 0)
+                                .padding(.leading, 5)
+                                // `.allowsHitTesting(false)` lets clicks pass through
+                                // to the TextEditor underneath so it can still focus.
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    // `.scrollIndicators(.hidden)` hides the scrollbar that
+                    // TextEditor shows while scrolling its content.
+                    .scrollIndicators(.hidden)
                     .focused($focusedField, equals: .notes)
             }
 
@@ -119,7 +149,7 @@ struct TaskFormView: View {
             }
         }
         .padding(24)
-        .frame(width: 380)
+        .frame(width: 520)
 
         // `.onAppear` runs the closure once, right after the view is first rendered.
         // This is the right place to pre-fill the form fields when editing an

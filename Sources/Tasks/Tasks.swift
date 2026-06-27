@@ -114,7 +114,7 @@ struct TasksApp: App {
                         .environment(authManager)
                 }
             }
-            .frame(minWidth: 440, minHeight: 110)
+            .frame(minWidth: 650, minHeight: 425)
         }
 
         // `.commands` lets you customise the macOS menu bar for this scene.
