@@ -80,13 +80,8 @@ struct TaskListView: View {
                 List(selection: $selectedTaskID) {
                     Section {
                         ForEach(activeTasks) { task in
-                            TaskRowView(
-                                task: task,
-                                isSelected: task.id == selectedTaskID,
-                                onEdit: { taskToEdit = task },
-                                onDelete: { taskToDelete = task }
-                            )
-                            .listSectionSeparator(.hidden, edges: .top)
+                            row(for: task)
+                                .listSectionSeparator(.hidden, edges: .top)
                         }
                         .onMove { source, destination in
                             guard let sourceIndex = source.first else { return }
@@ -103,12 +98,7 @@ struct TaskListView: View {
 
                     if showCompleted {
                         ForEach(completedTasks) { task in
-                            TaskRowView(
-                                task: task,
-                                isSelected: task.id == selectedTaskID,
-                                onEdit: { taskToEdit = task },
-                                onDelete: { taskToDelete = task }
-                            )
+                            row(for: task)
                         }
                     }
                 }
@@ -194,6 +184,11 @@ struct TaskListView: View {
         // so the View ▸ Show Completed menu item can read and flip the same state.
         .focusedSceneValue(\.showCompleted, $showCompleted)
 
+        // Publishes the "toggle done" action so the View ▸ Toggle Completed menu
+        // item (⇧⌘O) can flip the selected task. Calls through to a method (rather
+        // than an inline closure) to keep `body` light enough for the type-checker.
+        .focusedSceneValue(\.toggleDoneAction, toggleSelectedDone)
+
         // `.sheet(isPresented:)` watches the `$showingAddTask` binding. When it
         // becomes `true`, SwiftUI presents the closure's view as a modal sheet.
         // When the sheet is dismissed (by `dismiss()` inside TaskFormView), SwiftUI
@@ -256,6 +251,25 @@ struct TaskListView: View {
             return
         }
         selectedTaskID = visibleTasks.first?.id
+    }
+
+    // Builds a single task row. Both the active and completed sections render the
+    // same row, so factoring it out keeps the two call sites identical — and keeps
+    // `body` simple enough for the Swift type-checker.
+    private func row(for task: GoogleTask) -> some View {
+        TaskRowView(
+            task: task,
+            isSelected: task.id == selectedTaskID,
+            onEdit: { taskToEdit = task },
+            onDelete: { taskToDelete = task }
+        )
+    }
+
+    // Flips the selected task between done and not-done via the store. No-ops when
+    // nothing is selected. Backs the View ▸ Toggle Completed menu item (⇧⌘O).
+    private func toggleSelectedDone() {
+        guard let task = selectedTask else { return }
+        _Concurrency.Task { await store.toggleComplete(task) }
     }
 
     // Deletes the task and, when it was the selected row, moves the selection to

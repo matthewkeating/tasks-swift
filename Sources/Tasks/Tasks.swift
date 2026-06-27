@@ -34,6 +34,21 @@ extension FocusedValues {
     }
 }
 
+// Same pattern as `newTaskAction`: an action closure published by TaskListView so
+// the View ▸ Toggle Completed menu item (⇧⌘O) can flip the selected task's done
+// state. The closure captures the current selection, so it's nil-safe internally —
+// it no-ops when nothing is selected.
+private struct ToggleDoneActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var toggleDoneAction: (() -> Void)? {
+        get { self[ToggleDoneActionKey.self] }
+        set { self[ToggleDoneActionKey.self] = newValue }
+    }
+}
+
 // Same pattern as `newTaskAction`: an action closure published by MainView so the
 // app menu's "Settings…" item can open the settings sheet that lives inside the
 // main window (rather than a separate Settings window).
@@ -92,6 +107,10 @@ struct TasksApp: App {
     // The binding to TaskListView's `showCompleted` state, published while that
     // view is on screen. Nil otherwise (e.g. the sign-in screen).
     @FocusedValue(\.showCompleted) private var showCompleted
+
+    // The "toggle the selected task's done state" action, published by
+    // TaskListView. Nil when that view isn't on screen, which disables the menu item.
+    @FocusedValue(\.toggleDoneAction) private var toggleDoneAction
 
     // The action that opens the in-window settings sheet, published by MainView.
     // Nil when the main view isn't on screen (e.g. the sign-in screen), which
@@ -182,6 +201,14 @@ struct TasksApp: App {
                 Toggle("Show Completed", isOn: showCompleted ?? .constant(false))
                     .disabled(showCompleted == nil)
                     .keyboardShortcut("c", modifiers: [.command, .shift])
+
+                // Flips the selected task between done and not-done. The action is
+                // published by TaskListView and captures its current selection, so
+                // it's enabled whenever the list is on screen and quietly no-ops
+                // when no row is selected.
+                Button("Toggle Completed") { toggleDoneAction?() }
+                    .disabled(toggleDoneAction == nil)
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
 
                 Button("Toggle Sidebar") {
                     NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)

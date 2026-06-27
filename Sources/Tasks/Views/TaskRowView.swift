@@ -75,7 +75,7 @@ struct TaskRowView: View {
 
             if isSelected {
                 Button(action: onEdit) {
-                    Image(systemName: "pencil")
+                    Image(systemName: "square.and.pencil")
                         .foregroundStyle(.secondary)
                         .font(.body)
                 }
@@ -89,7 +89,7 @@ struct TaskRowView: View {
                 .buttonStyle(.plain)
             }
 
-            Image(systemName: "note.text")
+            Image(systemName: "document")
                 .foregroundStyle(.secondary)
                 .font(.caption)
                 .opacity((task.notes?.isEmpty == false) ? 1 : 0)  // The note icon now always occupies its space — it's just invisible when the task has no notes 
