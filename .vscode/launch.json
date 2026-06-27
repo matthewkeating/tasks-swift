@@ -5,17 +5,20 @@
             "type": "swift",
             "request": "launch",
             "name": "Debug Tasks",
-            "program": "${workspaceFolder}/.build/debug/Tasks",
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Build Debug"
+            "cwd": "${workspaceFolder:tasks-swift}",
+            "preLaunchTask": "swift: Build Debug Tasks",
+            "target": "Tasks",
+            "configuration": "debug"
         },
         {
             "type": "swift",
             "request": "launch",
             "name": "Debug Tasks (Mock Data)",
             "program": "${workspaceFolder}/.build/debug/Tasks",
-            "args": ["-mock"],
+            "args": [
+                "-mock"
+            ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Build Debug"
         },
@@ -23,10 +26,11 @@
             "type": "swift",
             "request": "launch",
             "name": "Release Tasks",
-            "program": "${workspaceFolder}/.build/release/Tasks",
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Build Release"
+            "cwd": "${workspaceFolder:tasks-swift}",
+            "preLaunchTask": "swift: Build Release Tasks",
+            "target": "Tasks",
+            "configuration": "release"
         }
     ]
 }
