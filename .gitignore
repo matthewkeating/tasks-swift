@@ -1,0 +1,18 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# VS Code — keep shared project configs, ignore personal settings
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# Xcode (if ever opened in Xcode)
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
