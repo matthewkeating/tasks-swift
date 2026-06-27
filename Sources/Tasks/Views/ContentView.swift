@@ -61,6 +61,15 @@ struct ContentView: View {
     }
 }
 
+// Identifies the two focusable panes of the split view. A single shared
+// `@FocusState` keyed on this enum lets MainView move keyboard focus between the
+// sidebar and the task list programmatically — which is what powers the
+// Left/Right arrow navigation between them (Left → sidebar, Right → list).
+enum Pane: Hashable {
+    case sidebar
+    case list
+}
+
 // MainView owns the two-pane navigation layout: a sidebar list of task lists
 // on the left and the selected list's tasks on the right.
 struct MainView: View {
@@ -74,6 +83,12 @@ struct MainView: View {
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var keyMonitor: Any?
+
+    // Shared keyboard focus across the two panes. Tagging the sidebar `List` and
+    // the task `List` (the latter via a binding passed into TaskListView) with the
+    // same `@FocusState` lets either pane claim focus by assignment — see the
+    // Right-arrow handler below and the Left-arrow handler in TaskListView.
+    @FocusState private var focusedPane: Pane?
 
     // Drives the "New List" alert and holds the in-progress name the user types.
     @State private var showingAddList = false
@@ -134,6 +149,16 @@ struct MainView: View {
             }
             // Sets a minimum and preferred width for the sidebar column.
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            // Bind the sidebar into the shared focus system, then let Right-arrow
+            // hand focus to the task list. The underlying table view uses Up/Down
+            // for row selection but leaves Left/Right alone, so `.onKeyPress` sees
+            // them. Returning `.handled` claims the keystroke; the list keeps its
+            // current selection.
+            .focused($focusedPane, equals: .sidebar)
+            .onKeyPress(.rightArrow) {
+                focusedPane = .list
+                return .handled
+            }
             // `.sidebar` applies the platform-standard sidebar appearance
             // (translucent background, slightly smaller text, etc.).
             .listStyle(.sidebar)
@@ -209,7 +234,7 @@ struct MainView: View {
                 Text("This removes the list and all of its tasks.")
             }
         } detail: {
-            TaskListView()
+            TaskListView(focusedPane: $focusedPane)
                 // Set the window/navigation title to the selected list's name.
                 .navigationTitle(currentTitle)
         }

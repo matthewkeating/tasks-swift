@@ -25,11 +25,12 @@ struct TaskListView: View {
     @State private var taskToEdit: GoogleTask?
     @State private var taskToDelete: GoogleTask?
 
-    // Tracks whether the task List holds keyboard focus. Driving it to `true`
-    // when the list first appears means Up/Down, Return, and Delete work without
-    // first clicking a row. Scoped to the list's appearance (not data refreshes
-    // or list switches) so it never steals focus from the edit sheet or sidebar.
-    @FocusState private var isListFocused: Bool
+    // The shared two-pane focus state, owned by MainView and passed in as a
+    // binding. `@FocusState.Binding` is how a child view participates in a parent's
+    // `@FocusState`. Tagging this List with `equals: .list` lets us claim focus on
+    // appear (so Up/Down, Return, and Delete work without first clicking a row) and
+    // hand focus back to the sidebar on Left-arrow.
+    @FocusState.Binding var focusedPane: Pane?
 
     private var activeTasks: [GoogleTask] {
         store.selectedTasks.filter { !$0.isDone }
@@ -135,13 +136,20 @@ struct TaskListView: View {
                     guard let task = selectedTask else { return }
                     taskToDelete = task
                 }
-                // Bind the List into the focus system, then claim focus once it
-                // appears. The `DispatchQueue.main.async` defers the assignment to
+                // Bind the List into the shared focus system, then claim focus once
+                // it appears. The `DispatchQueue.main.async` defers the assignment to
                 // the next runloop tick — setting `@FocusState` during the same
                 // pass the view is first installed often doesn't take.
-                .focused($isListFocused)
+                .focused($focusedPane, equals: .list)
                 .onAppear {
-                    DispatchQueue.main.async { isListFocused = true }
+                    DispatchQueue.main.async { focusedPane = .list }
+                }
+                // Left-arrow hands focus back to the sidebar — the mirror of the
+                // sidebar's Right-arrow. The table view consumes Up/Down for row
+                // selection but leaves Left/Right for `.onKeyPress` to handle.
+                .onKeyPress(.leftArrow) {
+                    focusedPane = .sidebar
+                    return .handled
                 }
             }
         }
