@@ -51,30 +51,6 @@ struct TaskListView: View {
         visibleTasks.first { $0.id == selectedTaskID }
     }
 
-    // The selection binding handed to the List. Clicking the empty area below the
-    // rows makes the List clear its selection, writing `nil` through this binding.
-    // We re-assert the previous selection on the next runloop tick so that click
-    // ends up having no effect. The restore must be deferred: the underlying
-    // AppKit table has already cleared its selection by the time this setter runs,
-    // and only a fresh state transition on a later tick makes SwiftUI re-push the
-    // selection back to it. Programmatic selection changes (delete, list switch,
-    // selectFirstTaskIfNeeded) assign `selectedTaskID` directly and never route
-    // through here, so they can still legitimately clear the selection.
-    private var listSelection: Binding<GoogleTask.ID?> {
-        Binding(
-            get: { selectedTaskID },
-            set: { newValue in
-                if let newValue {
-                    selectedTaskID = newValue
-                    return
-                }
-                let previous = selectedTaskID
-                selectedTaskID = nil
-                DispatchQueue.main.async { selectedTaskID = previous }
-            }
-        )
-    }
-
     var body: some View {
         Group {
             if store.isLoading {
@@ -99,7 +75,7 @@ struct TaskListView: View {
                 // `TaskRowView` per task. `ForEach` requires each item to be
                 // `Identifiable` (have a unique `id` property) so SwiftUI can
                 // efficiently update only the rows that changed.
-                List(selection: listSelection) {
+                List(selection: $selectedTaskID) {
                     Section {
                         ForEach(activeTasks) { task in
                             TaskRowView(
@@ -137,6 +113,16 @@ struct TaskListView: View {
                 // `.inset` is a list style that shows rows with inset (indented)
                 // separators — a common appearance in macOS detail views.
                 .listStyle(.inset)
+                // Stop a click in the empty area below the rows from clearing the
+                // selection. The List is backed by an NSTableView; setting its
+                // `allowsEmptySelection` to `false` makes AppKit refuse to drop to
+                // an empty selection on a background click, so the current task
+                // stays selected with no flicker. The legitimate "nothing selected"
+                // states (no tasks, all filtered out) coincide with the table
+                // having zero rows, where this flag has nothing to override.
+                .background(TableConfigurator { tableView in
+                    tableView.allowsEmptySelection = false
+                })
                 // Keyboard navigation for the selected row. `.onKeyPress` only
                 // fires while the List holds keyboard focus, so these don't
                 // interfere with typing in the edit sheet or elsewhere. Returning
