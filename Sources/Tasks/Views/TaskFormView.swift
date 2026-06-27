@@ -28,6 +28,9 @@ struct TaskFormView: View {
     // never changes while the form is open. The caller decides create vs. edit.
     let mode: TaskFormMode
 
+    // Called with the new task's ID after a successful create. Nil in edit mode.
+    var onCreated: ((GoogleTask.ID) -> Void)? = nil
+
     // These two `@State` properties hold the current values of the form fields.
     // They start with sensible defaults and are optionally pre-filled by
     // `populateIfEditing()` when the form opens in edit mode.
@@ -154,12 +157,14 @@ struct TaskFormView: View {
             // `switch` on the mode to decide whether to create or update.
             switch mode {
             case .create:
-                await store.createTask(
+                if let id = await store.createTask(
                     title: trimmedTitle,
                     // Pass `nil` for notes if the field is empty — sending an
                     // empty string vs. nil can behave differently in some APIs.
                     notes: trimmedNotes.isEmpty ? nil : trimmedNotes
-                )
+                ) {
+                    onCreated?(id)
+                }
             case .edit(let task):
                 await store.updateTask(
                     task,

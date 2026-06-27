@@ -175,7 +175,7 @@ struct TaskListView: View {
         // When the sheet is dismissed (by `dismiss()` inside TaskFormView), SwiftUI
         // automatically sets `showingAddTask` back to `false`.
         .sheet(isPresented: $showingAddTask) {
-            TaskFormView(mode: .create)
+            TaskFormView(mode: .create, onCreated: { id in selectedTaskID = id })
         }
 
         // Shared edit sheet, presented for whichever task the user chose to edit

@@ -170,9 +170,10 @@ final class TaskStore {
 
     // Creates a new task in the currently selected list and inserts it at the
     // top of the local cache so the UI updates immediately.
-    func createTask(title: String, notes: String?) async {
+    @discardableResult
+    func createTask(title: String, notes: String?) async -> GoogleTask.ID? {
         // If somehow no list is selected, bail out — there's nowhere to create the task.
-        guard let listID = selectedListID else { return }
+        guard let listID = selectedListID else { return nil }
 
         let create = TaskCreate(title: title, notes: notes)
         do {
@@ -182,8 +183,10 @@ final class TaskStore {
             // or an empty array if the key doesn't exist yet — avoiding a force-
             // unwrap. `.insert(at: 0)` places the new task at the top of the list.
             tasksByList[listID, default: []].insert(newTask, at: 0)
+            return newTask.id
         } catch {
             self.error = error.localizedDescription
+            return nil
         }
     }
 
