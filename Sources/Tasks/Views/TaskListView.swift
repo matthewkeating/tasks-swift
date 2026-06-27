@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // TaskListView is the detail column of the NavigationSplitView. It shows the
@@ -141,6 +142,9 @@ struct TaskListView: View {
                 .onAppear {
                     DispatchQueue.main.async { isListFocused = true }
                 }
+                // Stops a click on the empty area below the rows from clearing the
+                // selection. See NoEmptySelection for details.
+                .background(NoEmptySelection())
             }
         }
         // Keep a sensible row selected so keyboard navigation (Up/Down, Return,
@@ -256,6 +260,54 @@ struct TaskListView: View {
         }
         if index + 1 < tasks.count { return tasks[index + 1].id }
         if index - 1 >= 0 { return tasks[index - 1].id }
+        return nil
+    }
+}
+
+// SwiftUI's `List` is backed by an `NSTableView`, and by default that table
+// clears its selection when you click the empty area below the last row. Setting
+// `allowsEmptySelection = false` makes the table ignore those clicks entirely —
+// the click never produces an empty selection, so there's no deselect/reselect
+// flicker (unlike reacting to the binding after the fact).
+//
+// This sits as a `.background` of the List. On appear we walk the AppKit view
+// tree to find the table behind it; we also re-apply on every SwiftUI update
+// because the framework can reset the flag when it refreshes the List.
+private struct NoEmptySelection: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        apply(from: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        apply(from: nsView)
+    }
+
+    // Defer to the next runloop tick so the surrounding List has been installed
+    // into the window's view hierarchy by the time we search for it.
+    private func apply(from view: NSView) {
+        DispatchQueue.main.async {
+            // Walk up the superview chain; at each ancestor search its subtree for
+            // the nearest NSTableView. Because this view is a background of the
+            // detail List, the detail's table is found before we climb high enough
+            // to reach the sidebar's table.
+            var ancestor: NSView? = view
+            while let current = ancestor {
+                if let table = Self.firstTableView(in: current) {
+                    table.allowsEmptySelection = false
+                    return
+                }
+                ancestor = current.superview
+            }
+        }
+    }
+
+    private static func firstTableView(in view: NSView) -> NSTableView? {
+        if let table = view as? NSTableView { return table }
+        for subview in view.subviews {
+            if let table = firstTableView(in: subview) { return table }
+        }
         return nil
     }
 }
