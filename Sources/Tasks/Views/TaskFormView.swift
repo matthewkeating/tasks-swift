@@ -80,13 +80,7 @@ struct TaskFormView: View {
                     // (no jump) but nothing is visible. `Color.accentColor` is the
                     // system accent — the same colour used for selected list rows
                     // and the prominent Return-key button.
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(
-                                focusedField == .title ? Color.accentColor : .clear,
-                                lineWidth: 1
-                            )
-                    )
+
                     .focused($focusedField, equals: .title)
             }
 
