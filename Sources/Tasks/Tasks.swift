@@ -1,5 +1,6 @@
 import SwiftUI
 import GoogleSignIn
+import KeyboardShortcuts
 
 // A `FocusedValueKey` lets a view deep in the hierarchy publish a value (here, an
 // action closure) that commands defined far away in the App's menu bar can read.
@@ -33,6 +34,20 @@ extension FocusedValues {
     }
 }
 
+// Same pattern as `newTaskAction`: an action closure published by MainView so the
+// app menu's "Settings…" item can open the settings sheet that lives inside the
+// main window (rather than a separate Settings window).
+private struct ShowSettingsActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+extension FocusedValues {
+    var showSettingsAction: (() -> Void)? {
+        get { self[ShowSettingsActionKey.self] }
+        set { self[ShowSettingsActionKey.self] = newValue }
+    }
+}
+
 // Required when running as a plain SPM executable (no .app bundle) so that
 // macOS treats this process as a regular GUI app with a Dock icon and windows.
 // Without this, the default activation policy suppresses all UI.
@@ -47,6 +62,15 @@ private class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate(ignoringOtherApps: true)
+        // Bind the system-wide hotkey now that the app is up. See GlobalHotkey.
+        GlobalHotkey.register()
+    }
+
+    // Returning true tells AppKit to restore a window when there are none visible
+    // — the standard Dock-icon-reopen behaviour. GlobalHotkey leans on this to
+    // bring the app back after its window has been closed (not just hidden).
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        return true
     }
 }
 
@@ -68,6 +92,11 @@ struct TasksApp: App {
     // The binding to TaskListView's `showCompleted` state, published while that
     // view is on screen. Nil otherwise (e.g. the sign-in screen).
     @FocusedValue(\.showCompleted) private var showCompleted
+
+    // The action that opens the in-window settings sheet, published by MainView.
+    // Nil when the main view isn't on screen (e.g. the sign-in screen), which
+    // disables the menu item.
+    @FocusedValue(\.showSettingsAction) private var showSettingsAction
 
     // `@State` is a SwiftUI property wrapper that gives a view (or App) ownership
     // of a piece of mutable data. When an `@State` value changes, SwiftUI
@@ -119,6 +148,15 @@ struct TasksApp: App {
 
         // `.commands` lets you customise the macOS menu bar for this scene.
         .commands {
+            // `.appSettings` is the placement of the standard "Settings…" item in
+            // the app menu (with its conventional ⌘, shortcut). Replacing it lets
+            // our own button open the in-window settings sheet instead of spawning
+            // a separate Settings window. Disabled when no main view is on screen.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { showSettingsAction?() }
+                    .disabled(showSettingsAction == nil)
+                    .keyboardShortcut(",", modifiers: .command)
+            }
             // `CommandGroup(replacing: .newItem)` replaces the built-in "New" menu
             // item (Cmd+N) — which would create a new document window this app
             // doesn't support — with our own "New Task" item. The `.newItem`

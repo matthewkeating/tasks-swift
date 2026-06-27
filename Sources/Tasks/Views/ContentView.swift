@@ -83,6 +83,10 @@ struct MainView: View {
     // confirmation dialog; the dialog clears it back to nil when dismissed.
     @State private var listPendingDeletion: TaskList?
 
+    // Drives the settings sheet, presented in-window like TaskFormView. Set to
+    // true by the app menu's "Settings…" item via the published focused action.
+    @State private var showingSettings = false
+
     var body: some View {
 
         // `@Bindable` is needed to create two-way `$` bindings to properties of
@@ -242,6 +246,16 @@ struct MainView: View {
         }
         .onDisappear {
             if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
+        }
+
+        // Publish the "open settings" action so the app menu's Settings… item can
+        // trigger the in-window sheet (see Tasks.swift). Mirrors how TaskListView
+        // publishes its New Task action.
+        .focusedSceneValue(\.showSettingsAction) { showingSettings = true }
+
+        // The settings sheet itself, presented inside the main window.
+        .sheet(isPresented: $showingSettings) {
+            SettingsFormView()
         }
     }
 

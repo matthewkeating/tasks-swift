@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // TaskListView is the detail column of the NavigationSplitView. It shows the
 // tasks for whichever list the user has selected in the sidebar, with toolbar
@@ -163,6 +164,18 @@ struct TaskListView: View {
         .onChange(of: store.selectedListID) { selectFirstTaskIfNeeded() }
         .onChange(of: store.selectedTasks) { selectFirstTaskIfNeeded() }
         .onChange(of: showCompleted) { selectFirstTaskIfNeeded() }
+
+        // The global "new task" hotkey (see GlobalHotkey). When this view is on
+        // screen the notification arrives directly; when the hotkey had to reopen a
+        // closed window, this view instead picks up the pending request as it
+        // appears. Both paths just open the add-task sheet.
+        .onReceive(NotificationCenter.default.publisher(for: .newTaskHotkey)) { _ in
+            showingAddTask = true
+            NewTaskRequest.markHandled()
+        }
+        .onAppear {
+            if NewTaskRequest.consume() { showingAddTask = true }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { showingAddTask = true }) {
