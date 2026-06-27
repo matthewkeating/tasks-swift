@@ -12,8 +12,9 @@ struct TaskListView: View {
     @State private var showingAddTask = false
 
     // When `false`, completed tasks are filtered out of the list. The user
-    // can toggle this with the toolbar button.
-    @State private var showCompleted = false
+    // can toggle this with the toolbar button. Persisted in UserDefaults so the
+    // choice is remembered across app launches.
+    @AppStorage("showCompleted") private var showCompleted = false
     @State private var selectedTaskID: GoogleTask.ID?
 
     // Drive the shared edit sheet and delete confirmation. Both the mouse paths
