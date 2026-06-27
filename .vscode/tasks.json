@@ -27,6 +27,28 @@
             "problemMatcher": ["$swiftc"]
         },
         {
+            "label": "Bundle Debug App",
+            "type": "shell",
+            "command": "swift build && ./scripts/make-app.sh debug",
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": ["$swiftc"]
+        },
+        {
+            "label": "Bundle Release App",
+            "type": "shell",
+            "command": "swift build -c release && ./scripts/make-app.sh release",
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": ["$swiftc"]
+        },
+        {
             "label": "Clean",
             "type": "shell",
             "command": "swift package clean",

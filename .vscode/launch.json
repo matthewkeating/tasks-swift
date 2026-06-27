@@ -5,32 +5,33 @@
             "type": "swift",
             "request": "launch",
             "name": "Debug Tasks",
+            // Launch the binary from inside the assembled .app bundle so that
+            // Bundle.main reads Contents/Info.plist (GIDClientID, bundle id) and
+            // the OAuth redirect URL scheme is registered — matching production.
+            "program": "${workspaceFolder}/.build/debug/Tasks.app/Contents/MacOS/Tasks",
             "args": [],
-            "cwd": "${workspaceFolder:tasks-swift}",
-            "preLaunchTask": "swift: Build Debug Tasks",
-            "target": "Tasks",
-            "configuration": "debug"
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Bundle Debug App"
         },
         {
             "type": "swift",
             "request": "launch",
             "name": "Debug Tasks (Mock Data)",
-            "program": "${workspaceFolder}/.build/debug/Tasks",
+            "program": "${workspaceFolder}/.build/debug/Tasks.app/Contents/MacOS/Tasks",
             "args": [
                 "-mock"
             ],
             "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Build Debug"
+            "preLaunchTask": "Bundle Debug App"
         },
         {
             "type": "swift",
             "request": "launch",
             "name": "Release Tasks",
+            "program": "${workspaceFolder}/.build/release/Tasks.app/Contents/MacOS/Tasks",
             "args": [],
-            "cwd": "${workspaceFolder:tasks-swift}",
-            "preLaunchTask": "swift: Build Release Tasks",
-            "target": "Tasks",
-            "configuration": "release"
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Bundle Release App"
         }
     ]
 }
