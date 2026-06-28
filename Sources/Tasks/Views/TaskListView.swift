@@ -54,30 +54,6 @@ struct TaskListView: View {
         visibleTasks.first { $0.id == selectedTaskID }
     }
 
-    // The selection binding handed to the List. Clicking the empty area below the
-    // rows makes the List clear its selection, writing `nil` through this binding.
-    // We re-assert the previous selection on the next runloop tick so that click
-    // ends up having no effect. The restore must be deferred: the underlying
-    // AppKit table has already cleared its selection by the time this setter runs,
-    // and only a fresh state transition on a later tick makes SwiftUI re-push the
-    // selection back to it. Programmatic selection changes (delete, list switch,
-    // selectFirstTaskIfNeeded) assign `selectedTaskID` directly and never route
-    // through here, so they can still legitimately clear the selection.
-    private var listSelection: Binding<GoogleTask.ID?> {
-        Binding(
-            get: { selectedTaskID },
-            set: { newValue in
-                if let newValue {
-                    selectedTaskID = newValue
-                    return
-                }
-                let previous = selectedTaskID
-                selectedTaskID = nil
-                DispatchQueue.main.async { selectedTaskID = previous }
-            }
-        )
-    }
-
     var body: some View {
         Group {
             if store.isLoading {
@@ -102,7 +78,7 @@ struct TaskListView: View {
                 // `TaskRowView` per task. `ForEach` requires each item to be
                 // `Identifiable` (have a unique `id` property) so SwiftUI can
                 // efficiently update only the rows that changed.
-                List(selection: listSelection) {
+                List(selection: $selectedTaskID) {
                     Section {
                         ForEach(activeTasks) { task in
                             row(for: task)
@@ -167,15 +143,10 @@ struct TaskListView: View {
                 }
             }
         }
-        // Keep a sensible row selected so keyboard navigation (Up/Down, Return,
-        // Delete) is live without first clicking a row. Runs on appear and
-        // whenever the visible set changes: switching lists (`selectedListID`),
-        // tasks finishing their async load (`selectedTasks`), or toggling the
-        // completed section (`showCompleted`).
-        .onAppear { selectFirstTaskIfNeeded() }
-        .onChange(of: store.selectedListID) { selectFirstTaskIfNeeded() }
-        .onChange(of: store.selectedTasks) { selectFirstTaskIfNeeded() }
-        .onChange(of: showCompleted) { selectFirstTaskIfNeeded() }
+        // The list starts with nothing selected (the default). Keyboard navigation
+        // still works because the List claims focus on appear (see `.focused` above):
+        // with the list focused and no selection, the backing table selects the
+        // first row on Down-arrow and the last row on Up-arrow.
 
         // The global "new task" hotkey (see GlobalHotkey). When this view is on
         // screen the notification arrives directly; when the hotkey had to reopen a
@@ -262,17 +233,6 @@ struct TaskListView: View {
             // string fallback so `Text` always receives a non-optional value.
             Text(store.error ?? "")
         }
-    }
-
-    // Selects the first visible task when nothing is selected, or when the
-    // current selection has scrolled out of view (e.g. after switching lists or
-    // hiding the completed section). Leaves a still-valid selection untouched so
-    // it doesn't fight the user's own navigation.
-    private func selectFirstTaskIfNeeded() {
-        if let id = selectedTaskID, visibleTasks.contains(where: { $0.id == id }) {
-            return
-        }
-        selectedTaskID = visibleTasks.first?.id
     }
 
     // Builds a single task row. Both the active and completed sections render the
