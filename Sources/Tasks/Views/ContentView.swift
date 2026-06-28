@@ -120,7 +120,8 @@ struct MainView: View {
             // `store.taskLists` is the data source (an Array of TaskList).
             // `selection: $store.selectedListID` is a two-way binding — tapping
             // a row writes that row's identifier back to `store.selectedListID`.
-            List(store.taskLists, selection: $store.selectedListID) { list in
+            List(store.taskLists.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
+                 selection: $store.selectedListID) { list in
                 let activeCount = store.tasksByList[list.id]?.filter { !$0.isDone }.count ?? 0
                 HStack {
                     Text(list.title)
