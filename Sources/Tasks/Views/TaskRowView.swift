@@ -43,7 +43,7 @@ struct TaskRowView: View {
                 // Switches the SF Symbol and colour based on completion state.
                 // `task.isDone ? A : B` is a ternary — returns A when done, B when not.
                 Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(task.isDone ? .green : .secondary)
+                    .foregroundStyle(task.isDone ? Color.accentColor : .secondary)
                     .font(.title3)
             }
             // `.plain` removes the default button background and border, leaving
