@@ -59,12 +59,18 @@ struct TaskFormView: View {
             // tighter spacing (6pt) than the outer VStack (20pt).
             VStack(alignment: .leading, spacing: 6) {
 
-                // `TextField` is a single-line text input.
+                // `TextField` is a text input. Passing `axis: .vertical` lets the
+                // field grow downward onto new lines as the text gets longer,
+                // instead of scrolling horizontally on a single line.
                 // The first argument is placeholder text shown when the field is empty.
                 // `text: $title` is a two-way binding — changes the user makes in the
                 // field are automatically written back to `title`, and changes to
                 // `title` in code are reflected in the field.
-                TextField("Title", text: $title)
+                TextField("Title", text: $title, axis: .vertical)
+                    // `.lineLimit(1...5)` keeps the field at one line when short but
+                    // allows it to expand up to five lines for a long title before it
+                    // starts scrolling internally — so it never grows unbounded.
+                    .lineLimit(1...5)
                     // `.title2` is a larger system text style; `.bold()` weights it.
                     // Using a semantic style (rather than a fixed point size) keeps
                     // the field in step with the user's Dynamic Type settings.
@@ -82,6 +88,10 @@ struct TaskFormView: View {
                     // and the prominent Return-key button.
 
                     .focused($focusedField, equals: .title)
+                    // Swallow the Return key while the title field has focus so it
+                    // does nothing — returning `.handled` stops the event before the
+                    // default behaviour (which was selecting all the text) can run.
+                    .onKeyPress(.return) { .handled }
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -90,9 +100,11 @@ struct TaskFormView: View {
                 // It also uses a two-way binding via `$notes`.
                 TextEditor(text: $notes)
                     .font(.body)
-                    // `.frame(height: 80)` fixes the editor's height so it doesn't
-                    // grow unbounded as the user types.
-                    .frame(height: 200)
+                    // `maxHeight: .infinity` lets the editor flex to fill whatever
+                    // vertical space is left over. Because the whole view has a fixed
+                    // height (see the outer `.frame` below), the editor shrinks to
+                    // absorb the title field's growth — keeping the sheet the same size.
+                    .frame(maxHeight: .infinity)
                     // TextEditor has no built-in placeholder (unlike TextField), so
                     // we fake one by overlaying a Text that's shown only while `notes`
                     // is empty. `alignment: .topLeading` sits it where typed text begins.
@@ -113,9 +125,13 @@ struct TaskFormView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    // `.scrollIndicators(.hidden)` hides the scrollbar that
-                    // TextEditor shows while scrolling its content.
-                    .scrollIndicators(.hidden)
+                    // `.scrollIndicators(.visible)` requests the scrollbar be shown
+                    // whenever the content is scrollable. Unlike `.automatic` (which
+                    // defers to the "show scroll bars only when scrolling" system
+                    // setting), this keeps it visible as soon as the notes overflow —
+                    // yet it still won't appear when the text fits, since there's
+                    // nothing to scroll.
+                    .scrollIndicators(.automatic)
                     .focused($focusedField, equals: .notes)
             }
 
@@ -143,7 +159,10 @@ struct TaskFormView: View {
             }
         }
         .padding(24)
-        .frame(width: 520)
+        // A fixed width *and* height keeps the sheet from resizing. The notes
+        // editor (which flexes via `maxHeight: .infinity`) takes up the slack, so
+        // when the title field expands the editor shrinks instead of the sheet.
+        .frame(width: 520, height: 360)
 
         // `.onAppear` runs the closure once, right after the view is first rendered.
         // This is the right place to pre-fill the form fields when editing an
@@ -194,7 +213,7 @@ struct TaskFormView: View {
                     task,
                     title: trimmedTitle,
                     notes: trimmedNotes.isEmpty ? nil : trimmedNotes
-                )
+                )   
             }
         }
 
