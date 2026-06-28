@@ -26,10 +26,7 @@ let package = Package(
                 .product(name: "GoogleSignIn", package: "GoogleSignIn-iOS"),
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
             ],
-            exclude: ["Info.plist"],
-            resources: [
-                .copy("AppIcon.icns")
-            ]
+            exclude: ["Info.plist"]
         ),
         .testTarget(
             name: "TasksTests",
