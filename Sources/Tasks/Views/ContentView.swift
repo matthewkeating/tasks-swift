@@ -120,7 +120,7 @@ struct MainView: View {
             // `store.taskLists` is the data source (an Array of TaskList).
             // `selection: $store.selectedListID` is a two-way binding — tapping
             // a row writes that row's identifier back to `store.selectedListID`.
-            List(store.taskLists.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
+            List(store.sortedTaskLists,
                  selection: $store.selectedListID) { list in
                 let activeCount = store.tasksByList[list.id]?.filter { !$0.isDone }.count ?? 0
                 HStack {
@@ -265,8 +265,12 @@ struct MainView: View {
                       let digit = event.charactersIgnoringModifiers.flatMap(Int.init),
                       (1...9).contains(digit) else { return event }
                 let index = digit - 1
-                guard index < store.taskLists.count else { return event }
-                store.selectedListID = store.taskLists[index].id
+                // Index into the same sorted ordering the sidebar renders so the
+                // Nth shortcut matches the Nth visible row (recomputed here so it
+                // always reflects the current lists, not a stale snapshot).
+                let sorted = store.sortedTaskLists
+                guard index < sorted.count else { return event }
+                store.selectedListID = sorted[index].id
                 return nil
             }
         }

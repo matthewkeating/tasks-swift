@@ -51,6 +51,13 @@ final class TaskStore {
         return tasksByList[id] ?? []
     }
 
+    // Task lists in the order they are shown in the sidebar (alphabetical,
+    // locale-aware). Both the sidebar List and the Cmd+# shortcuts read from
+    // this so the Nth shortcut always matches the Nth visible row.
+    var sortedTaskLists: [TaskList] {
+        taskLists.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
     // The client that supplies task data. Typed as the `TasksClient` protocol
     // rather than the concrete `GoogleTasksClient` so the store doesn't care
     // which implementation it's talking to — the real API client or the
