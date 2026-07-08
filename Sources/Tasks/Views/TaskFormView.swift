@@ -133,11 +133,27 @@ struct TaskFormView: View {
                     // nothing to scroll.
                     .scrollIndicators(.automatic)
                     .focused($focusedField, equals: .notes)
-                    // Swallow the Tab key so it never inserts a `\t` into the
-                    // notes. Returning `.handled` stops the event before
-                    // TextEditor's default behaviour (inserting a tab character)
-                    // can run — same trick as the Return key on the title above.
-                    .onKeyPress(.tab) { .handled }
+                    // Intercept the Tab key so it never inserts a `\t` into the
+                    // notes. We match every key press and filter for Tab
+                    // ourselves, because the `.onKeyPress(.tab)` overload hands
+                    // us a zero-argument closure with no access to the modifiers.
+                    // Shift+Tab moves focus back to the title; a plain Tab is
+                    // simply swallowed so it does nothing. Returning `.handled`
+                    // stops the event before TextEditor's default behaviour
+                    // (inserting a tab character) can run.
+                    .onKeyPress { press in
+                        // Plain Tab arrives as `.tab` ("\t"). But macOS delivers
+                        // Shift+Tab as the *back-tab* control character (U+0019,
+                        // NSBackTabCharacter) — so `press.key` is NOT `.tab` and
+                        // we have to match that character explicitly, otherwise
+                        // Shift+Tab slips through unhandled.
+                        let isBackTab = press.characters == "\u{19}"
+                        guard press.key == .tab || isBackTab else { return .ignored }
+                        if isBackTab || press.modifiers.contains(.shift) {
+                            focusedField = .title
+                        }
+                        return .handled
+                    }
             }
 
             // `HStack` arranges its children horizontally, left to right.
