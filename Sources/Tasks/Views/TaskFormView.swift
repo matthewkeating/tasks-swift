@@ -205,6 +205,12 @@ struct TaskFormView: View {
         // `task.notes` is Optional (the API may not return it). `?? ""` provides
         // an empty string so the TextEditor always has a non-nil binding.
         notes = task.notes ?? ""
+
+        // In edit mode, land the cursor in the notes field so the user can start
+        // annotating straight away. Assigning to `focusedField` (an `@FocusState`)
+        // programmatically moves keyboard focus; SwiftUI places the insertion
+        // point at the start of the existing text.
+        focusedField = .notes
     }
 
     // Validates and submits the form, then dismisses the sheet.
