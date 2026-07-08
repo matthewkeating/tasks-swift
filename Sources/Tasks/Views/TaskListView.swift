@@ -143,10 +143,25 @@ struct TaskListView: View {
                 }
             }
         }
-        // The list starts with nothing selected (the default). Keyboard navigation
-        // still works because the List claims focus on appear (see `.focused` above):
-        // with the list focused and no selection, the backing table selects the
-        // first row on Down-arrow and the last row on Up-arrow.
+        // Whenever the selected list changes — via sidebar arrow keys, a mouse
+        // click, or Cmd+# (all write `store.selectedListID`) — auto-select that
+        // list's first task so the user can act on it immediately (Return to edit,
+        // ⇧⌘O to complete, Delete) without first pressing Down or clicking a row.
+        // `initial: true` also runs on launch, once `loadTaskLists` has picked the
+        // first list. `visibleTasks.first` matches the top-to-bottom on-screen order.
+        .onChange(of: store.selectedListID, initial: true) {
+            selectedTaskID = visibleTasks.first?.id
+        }
+        // Safety net for the async gap: when a list is selected before its tasks
+        // have loaded (e.g. on first launch while the spinner shows), the handler
+        // above saw an empty list. Select the first task once the data arrives.
+        // Gated on `selectedTaskID == nil` so the background 15s refresh never
+        // steals the user's current selection.
+        .onChange(of: store.selectedTasks) {
+            if selectedTaskID == nil {
+                selectedTaskID = visibleTasks.first?.id
+            }
+        }
 
         // The global "new task" hotkey (see GlobalHotkey). When this view is on
         // screen the notification arrives directly; when the hotkey had to reopen a
