@@ -58,17 +58,58 @@ final class TaskStore {
     // rest of the app goes through the store's higher-level methods.
     private let client: TasksClient
 
+    // The auth manager, retained so we can sign the user out when the server
+    // rejects our credentials (see `handle(_:)`). Held even in mock mode — it's
+    // never asked to sign out there because the mock client never throws auth
+    // errors.
+    private let auth: AuthManager
+
     // Creates the store and wires up the data client. When `DevConfig.useMockData`
     // is set (via the `-mock` launch argument), it injects the in-memory
     // `MockTasksClient` — which never touches the keychain or network, so no
     // password prompt appears. Otherwise it builds the real `GoogleTasksClient`
     // backed by the given auth manager.
     init(auth: AuthManager) {
+        self.auth = auth
         if DevConfig.useMockData {
             self.client = MockTasksClient()
         } else {
             self.client = GoogleTasksClient(auth: auth)
         }
+    }
+
+    // MARK: - Error handling
+
+    // Central handling for any error thrown by the data client.
+    //
+    // Authentication failures get special treatment: when the user's Google
+    // session has expired or been revoked, every network call would otherwise
+    // throw and surface a cryptic "The operation couldn't be completed.
+    // (NSURLErrorDomain error 403.)" alert — once per refresh, which with the
+    // 15-second poll means the alert reappears constantly. Instead we sign the
+    // user out, which flips `AuthManager.isSignedIn` and returns the app to the
+    // sign-in screen so they can re-authenticate cleanly.
+    //
+    // All other errors keep the existing behaviour: store a human-readable
+    // message for the error alert to display.
+    private func handle(_ error: Error) {
+        if isAuthError(error) {
+            auth.signOut()
+            // Drop any stale error so the sign-in screen isn't showing an alert.
+            self.error = nil
+        } else {
+            self.error = error.localizedDescription
+        }
+    }
+
+    // Returns `true` when `error` means the user's Google session is no longer
+    // valid — either the API rejected the token (HTTP 401 Unauthorized or 403
+    // Forbidden, thrown by `GoogleTasksClient.validate`) or the token refresh
+    // itself reported that re-authentication is required.
+    private func isAuthError(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        if urlError.code == .userAuthenticationRequired { return true }
+        return urlError.code.rawValue == 401 || urlError.code.rawValue == 403
     }
 
     // MARK: - Load
@@ -101,11 +142,9 @@ final class TaskStore {
                 }
             }
         } catch {
-            // `error.localizedDescription` converts any Swift `Error` into a
-            // human-readable string in the user's language. Assigning it to
-            // `self.error` (the stored property) disambiguates it from the
-            // local `error` constant introduced by the `catch` clause.
-            self.error = error.localizedDescription
+            // Route through `handle` so an expired Google session signs the user
+            // out rather than repeatedly popping a "403" alert on every poll.
+            handle(error)
         }
     }
 
@@ -118,7 +157,7 @@ final class TaskStore {
                 tasksByList[listID] = fetched
             }
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 
@@ -135,7 +174,7 @@ final class TaskStore {
             tasksByList[newList.id] = []
             selectedListID = newList.id
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 
@@ -162,7 +201,7 @@ final class TaskStore {
             // Free the cached tasks for the deleted list so they aren't retained.
             tasksByList[list.id] = nil
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 
@@ -185,7 +224,7 @@ final class TaskStore {
             tasksByList[listID, default: []].insert(newTask, at: 0)
             return newTask.id
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
             return nil
         }
     }
@@ -204,7 +243,7 @@ final class TaskStore {
             // truth — the server may normalise or add fields we didn't send.
             replace(updated, in: listID)
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 
@@ -224,7 +263,7 @@ final class TaskStore {
             }
             replace(updated, in: listID)
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 
@@ -265,7 +304,7 @@ final class TaskStore {
             // updated fields such as a revised position token).
             replace(updated, in: listID)
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
             // The optimistic update may now be inconsistent — reload from the
             // server to restore the authoritative order.
             await loadTasks(listID: listID)
@@ -284,7 +323,7 @@ final class TaskStore {
             // the array for this list is nil (shouldn't happen, but safe).
             tasksByList[listID]?.removeAll { $0.id == task.id }
         } catch {
-            self.error = error.localizedDescription
+            handle(error)
         }
     }
 

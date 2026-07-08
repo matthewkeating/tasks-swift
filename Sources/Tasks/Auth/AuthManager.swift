@@ -87,8 +87,28 @@ final class AuthManager: @unchecked Sendable {
         try await withCheckedThrowingContinuation { continuation in
             GIDSignIn.sharedInstance.currentUser?.refreshTokensIfNeeded { user, error in
                 if let error {
-                    // The refresh network call failed — propagate the error.
-                    continuation.resume(throwing: error)
+                    // The refresh failed. We want to distinguish two very
+                    // different causes so callers can react appropriately:
+                    //
+                    //   • A transient network problem (offline, timeout, DNS).
+                    //     Surfaces as a `URLError`. The refresh token is still
+                    //     good — the user shouldn't be signed out just because
+                    //     their Wi-Fi dropped — so we propagate it unchanged and
+                    //     let `TaskStore` show a normal error alert.
+                    //
+                    //   • The refresh token itself is invalid or revoked (the
+                    //     session was terminated, the password changed, access
+                    //     was withdrawn). The SDK reports this as an OAuth/keychain
+                    //     error, *not* a `URLError`. There is no recovering without
+                    //     re-authenticating, so we normalise it to
+                    //     `.userAuthenticationRequired` — the same signal the
+                    //     defensive branch below uses — which `TaskStore.isAuthError`
+                    //     recognises and turns into a clean sign-out.
+                    if error is URLError {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(throwing: URLError(.userAuthenticationRequired))
+                    }
                 } else if let token = user?.accessToken.tokenString {
                     // We got a valid token string — return it to the async caller.
                     continuation.resume(returning: token)
