@@ -37,6 +37,12 @@ struct TaskFormView: View {
     @State private var title = ""
     @State private var notes = ""
 
+    // Tracks the text selection (and caret position) inside the notes editor.
+    // We drive this in `populateIfEditing()` to place the insertion point at the
+    // very start of the existing notes when the form opens in edit mode —
+    // focusing a TextEditor alone would otherwise land the caret at the end.
+    @State private var notesSelection: TextSelection? = nil
+
     enum Field { case title, notes }
     @FocusState private var focusedField: Field?
 
@@ -98,7 +104,7 @@ struct TaskFormView: View {
 
                 // `TextEditor` is a multi-line text input, unlike `TextField`.
                 // It also uses a two-way binding via `$notes`.
-                TextEditor(text: $notes)
+                TextEditor(text: $notes, selection: $notesSelection)
                     .font(.body)
                     // `maxHeight: .infinity` lets the editor flex to fill whatever
                     // vertical space is left over. Because the whole view has a fixed
@@ -208,8 +214,11 @@ struct TaskFormView: View {
 
         // In edit mode, land the cursor in the notes field so the user can start
         // annotating straight away. Assigning to `focusedField` (an `@FocusState`)
-        // programmatically moves keyboard focus; SwiftUI places the insertion
-        // point at the start of the existing text.
+        // programmatically moves keyboard focus, but SwiftUI would place the
+        // caret at the *end* of the existing text. Setting `notesSelection` to a
+        // zero-length selection at `notes.startIndex` overrides that and puts the
+        // insertion point in the first position instead.
+        notesSelection = TextSelection(insertionPoint: notes.startIndex)
         focusedField = .notes
     }
 

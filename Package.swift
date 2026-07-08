@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Tasks",
     platforms: [
-        .macOS(.v14) // Defines the app as macOS-only and sets the minimum framework version
+        .macOS(.v15) // Defines the app as macOS-only and sets the minimum framework version
     ],
     // Top-level packages this project fetches from remote sources
     dependencies: [
