@@ -133,6 +133,11 @@ struct TaskFormView: View {
                     // nothing to scroll.
                     .scrollIndicators(.automatic)
                     .focused($focusedField, equals: .notes)
+                    // Swallow the Tab key so it never inserts a `\t` into the
+                    // notes. Returning `.handled` stops the event before
+                    // TextEditor's default behaviour (inserting a tab character)
+                    // can run — same trick as the Return key on the title above.
+                    .onKeyPress(.tab) { .handled }
             }
 
             // `HStack` arranges its children horizontally, left to right.
