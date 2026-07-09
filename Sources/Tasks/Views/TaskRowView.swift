@@ -21,6 +21,23 @@ struct TaskRowView: View {
     var onEdit: () -> Void
     var onDelete: () -> Void
 
+    // Called when the row should become the selection — currently just the
+    // double-click-to-edit path, since List's native click handling already
+    // covers a plain single click.
+    var onSelect: () -> Void = {}
+
+    // Reports inline title-editing state up to TaskListView, so its own
+    // Return handler (which opens the edit sheet for the selected task) can
+    // stay out of the way while this row is already mid-edit.
+    var onEditingChanged: (Bool) -> Void = { _ in }
+
+    // Drives inline title editing, entered via a double-click on the title text.
+    // `editedTitle` holds the in-progress text until it's committed (Return, or
+    // losing focus) or discarded (Escape).
+    @State private var isEditingTitle = false
+    @State private var editedTitle = ""
+    @FocusState private var isTitleFieldFocused: Bool
+
     var body: some View {
 
         // `alignment: .top` aligns the checkbox button and the text VStack at
@@ -54,12 +71,41 @@ struct TaskRowView: View {
             // The text content: title, optional notes, optional due date.
             VStack(alignment: .leading, spacing: 2) {
 
-                Text(task.title)
-                    // `.strikethrough` draws a line through the text when `task.isDone`
-                    // is true — a common visual convention for completed items.
-                    .strikethrough(task.isDone, color: .secondary)
-                    // Dim the title when done to reinforce that it's complete.
-                    .foregroundStyle(task.isDone ? .secondary : .primary)
+                if isEditingTitle {
+                    TextField("Title", text: $editedTitle, axis: .vertical)
+                        .lineLimit(1...5)
+                        .textFieldStyle(.plain)
+                        .focused($isTitleFieldFocused)
+                        // A vertical-axis TextField treats Return as "insert a
+                        // newline" rather than "submit" — `.onSubmit` no longer
+                        // fires — so Return is intercepted here to commit instead.
+                        .onKeyPress(.return) {
+                            commitTitleEdit()
+                            return .handled
+                        }
+                        .onKeyPress(.escape) {
+                            cancelTitleEdit()
+                            return .handled
+                        }
+                        // Losing focus (e.g. clicking elsewhere) commits, the same
+                        // as pressing Return — only Escape discards the edit.
+                        .onChange(of: isTitleFieldFocused) {
+                            if !isTitleFieldFocused { commitTitleEdit() }
+                        }
+                } else {
+                    Text(task.title)
+                        // `.strikethrough` draws a line through the text when `task.isDone`
+                        // is true — a common visual convention for completed items.
+                        .strikethrough(task.isDone, color: .secondary)
+                        // Dim the title when done to reinforce that it's complete.
+                        .foregroundStyle(task.isDone ? .secondary : .primary)
+                        .onTapGesture(count: 2) { startTitleEdit() }
+                        // `.simultaneousGesture` (rather than a plain `.onTapGesture(count: 1)`)
+                        // fires immediately on every tap instead of waiting out the system's
+                        // double-click interval to rule out a second tap — that wait is what
+                        // caused a noticeable lag before the row selected.
+                        .simultaneousGesture(TapGesture().onEnded { onSelect() })
+                }
 
                 // Show the due date if the task has one.
                 if let due = task.due {
@@ -92,7 +138,11 @@ struct TaskRowView: View {
             Image(systemName: "document")
                 .foregroundStyle(.secondary)
                 .font(.caption)
-                .opacity((task.notes?.isEmpty == false) ? 1 : 0)  // The note icon now always occupies its space — it's just invisible when the task has no notes 
+                .opacity((task.notes?.isEmpty == false) ? 1 : 0)  // The note icon now always occupies its space — it's just invisible when the task has no notes
+
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+                .font(.caption)
         }
         // `.vertical` padding adds space above and below each row, preventing
         // the text from feeling cramped inside the List.
@@ -117,6 +167,34 @@ struct TaskRowView: View {
             // macOS, it renders the label in red.
             Button("Delete", role: .destructive, action: onDelete)
         }
+    }
+
+    // Enters inline editing: seeds the field with the current title and hands it
+    // keyboard focus (which also selects the text, macOS's default TextField
+    // behaviour on focus).
+    private func startTitleEdit() {
+        onSelect()
+        onEditingChanged(true)
+        editedTitle = task.title
+        isEditingTitle = true
+        isTitleFieldFocused = true
+    }
+
+    // Saves the edited title, unless it's empty or unchanged. Notes are passed
+    // through unchanged since `updateTask` patches both fields together.
+    private func commitTitleEdit() {
+        isEditingTitle = false
+        onEditingChanged(false)
+        let trimmed = editedTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != task.title else { return }
+        let t = task
+        _Concurrency.Task { await store.updateTask(t, title: trimmed, notes: t.notes) }
+    }
+
+    // Discards the in-progress edit without saving — bound to Escape.
+    private func cancelTitleEdit() {
+        isEditingTitle = false
+        onEditingChanged(false)
     }
 
     // Converts the ISO 8601 date string from the Google Tasks API into a

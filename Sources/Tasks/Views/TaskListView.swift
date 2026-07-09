@@ -25,6 +25,10 @@ struct TaskListView: View {
     @State private var taskToEdit: GoogleTask?
     @State private var taskToDelete: GoogleTask?
 
+    // Set by the selected row while its title is being edited inline, so the
+    // Return handler below can skip opening the edit sheet on top of it.
+    @State private var isEditingRowTitle = false
+
     // The shared two-pane focus state, owned by MainView and passed in as a
     // binding. `@FocusState.Binding` is how a child view participates in a parent's
     // `@FocusState`. Tagging this List with `equals: .list` lets us claim focus on
@@ -112,9 +116,11 @@ struct TaskListView: View {
                 // `.ignored` when nothing is selected lets the keystroke pass
                 // through to its default handling.
                 //
-                // Return → edit the selected task.
+                // Return → edit the selected task. Ignored while the row is
+                // already editing its title inline, so that Return commits the
+                // inline edit instead of also opening the edit sheet.
                 .onKeyPress(.return) {
-                    guard let task = selectedTask else { return .ignored }
+                    guard let task = selectedTask, !isEditingRowTitle else { return .ignored }
                     taskToEdit = task
                     return .handled
                 }
@@ -258,7 +264,9 @@ struct TaskListView: View {
             task: task,
             isSelected: task.id == selectedTaskID,
             onEdit: { taskToEdit = task },
-            onDelete: { taskToDelete = task }
+            onDelete: { taskToDelete = task },
+            onSelect: { selectedTaskID = task.id },
+            onEditingChanged: { isEditingRowTitle = $0 }
         )
     }
 
