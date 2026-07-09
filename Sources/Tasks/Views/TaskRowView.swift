@@ -99,25 +99,12 @@ struct TaskRowView: View {
                         .strikethrough(task.isDone, color: .secondary)
                         // Dim the title when done to reinforce that it's complete.
                         .foregroundStyle(task.isDone ? .secondary : .primary)
-                        .onTapGesture(count: 1) { startTitleEdit() }
+                        .onTapGesture(count: 2) { startTitleEdit() }
                         // `.simultaneousGesture` (rather than a plain `.onTapGesture(count: 1)`)
                         // fires immediately on every tap instead of waiting out the system's
                         // double-click interval to rule out a second tap — that wait is what
                         // caused a noticeable lag before the row selected.
                         .simultaneousGesture(TapGesture().onEnded { onSelect() })
-                        // Signals the title is editable on double-click: swap in
-                        // the I-beam (text-edit) cursor while hovering, and push
-                        // it back to the arrow on exit. `NSCursor.push`/`.pop`
-                        // form a stack, so every push here is paired with a pop
-                        // rather than an unconditional `.set()`, which would leave
-                        // the I-beam showing after the mouse leaves the row.
-                        .onHover { isHovering in
-                            if isHovering {
-                                NSCursor.iBeam.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
                 }
 
                 // Show the due date if the task has one.
