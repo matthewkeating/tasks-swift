@@ -18,6 +18,12 @@ struct TaskListView: View {
     @AppStorage("showCompleted") private var showCompleted = false
     @State private var selectedTaskID: GoogleTask.ID?
 
+    // Tracks where the real row content ends, in the `taskListArea` coordinate
+    // space (see the marker row and the click-eating overlay below), so the
+    // overlay can be sized to cover exactly the blank space beneath the last
+    // row and nothing else.
+    @State private var contentBottom: CGFloat = 0
+
     // Drive the shared edit sheet and delete confirmation. Both the mouse paths
     // (row buttons / context menu) and the keyboard paths (Return / Delete on the
     // selected row) set these, so there's a single source of truth for "edit
@@ -77,78 +83,124 @@ struct TaskListView: View {
                 .toolbarBackground(.hidden, for: .windowToolbar)
 
             } else {
-                // `List` renders a scrollable list of rows. Using `ForEach`
-                // inside `List` iterates over `visibleTasks` and creates one
-                // `TaskRowView` per task. `ForEach` requires each item to be
-                // `Identifiable` (have a unique `id` property) so SwiftUI can
-                // efficiently update only the rows that changed.
-                List(selection: $selectedTaskID) {
-                    Section {
-                        ForEach(activeTasks) { task in
-                            row(for: task)
-                                .listSectionSeparator(.hidden, edges: .top)
-                        }
-                        .onMove { source, destination in
-                            guard let sourceIndex = source.first else { return }
-                            let movedTask = activeTasks[sourceIndex]
+                // `ZStack` layers the click-eating overlay on top of the List,
+                // aligned to its top edge so the overlay's own top-anchored
+                // offset (below) lines up with the List's.
+                ZStack(alignment: .top) {
+                    // `List` renders a scrollable list of rows. Using `ForEach`
+                    // inside `List` iterates over `visibleTasks` and creates one
+                    // `TaskRowView` per task. `ForEach` requires each item to be
+                    // `Identifiable` (have a unique `id` property) so SwiftUI can
+                    // efficiently update only the rows that changed.
+                    List(selection: $selectedTaskID) {
+                        Section {
+                            ForEach(activeTasks) { task in
+                                row(for: task)
+                                    .listSectionSeparator(.hidden, edges: .top)
+                            }
+                            .onMove { source, destination in
+                                guard let sourceIndex = source.first else { return }
+                                let movedTask = activeTasks[sourceIndex]
 
-                            var tasks = activeTasks
-                            tasks.move(fromOffsets: source, toOffset: destination)
-                            let newIndex = tasks.firstIndex { $0.id == movedTask.id }!
-                            let afterTask = newIndex > 0 ? tasks[newIndex - 1] : nil
+                                var tasks = activeTasks
+                                tasks.move(fromOffsets: source, toOffset: destination)
+                                let newIndex = tasks.firstIndex { $0.id == movedTask.id }!
+                                let afterTask = newIndex > 0 ? tasks[newIndex - 1] : nil
 
-                            _Concurrency.Task { await store.moveTask(movedTaskID: movedTask.id, afterTaskID: afterTask?.id) }
+                                _Concurrency.Task { await store.moveTask(movedTaskID: movedTask.id, afterTaskID: afterTask?.id) }
+                            }
                         }
+
+                        if showCompleted {
+                            ForEach(completedTasks) { task in
+                                row(for: task)
+                            }
+                        }
+
+                        // Zero-height marker row. Its only job is to report,
+                        // via `ContentBottomKey`, where the real content ends
+                        // in the shared `taskListArea` coordinate space — used
+                        // below to size the click-eating overlay to exactly the
+                        // blank space beneath the last row.
+                        Color.clear
+                            .frame(height: 0)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: ContentBottomKey.self,
+                                        value: geo.frame(in: .named("taskListArea")).minY
+                                    )
+                                }
+                            )
+                    }
+                    // Defines the coordinate space the marker row above and the
+                    // overlay below both measure into, so the overlay lines up
+                    // with the real content regardless of scrolling.
+                    .coordinateSpace(name: "taskListArea")
+                    .onPreferenceChange(ContentBottomKey.self) { contentBottom = $0 }
+                    // `.inset` is a list style that shows rows with inset (indented)
+                    // separators — a common appearance in macOS detail views.
+                    .listStyle(.inset)
+                    // Keyboard navigation for the selected row. `.onKeyPress` only
+                    // fires while the List holds keyboard focus, so these don't
+                    // interfere with typing in the edit sheet or elsewhere. Returning
+                    // `.ignored` when nothing is selected lets the keystroke pass
+                    // through to its default handling.
+                    //
+                    // Return → edit the selected task. Ignored while the row is
+                    // already editing its title inline, so that Return commits the
+                    // inline edit instead of also opening the edit sheet.
+                    .onKeyPress(.return) {
+                        guard let task = selectedTask, !isEditingRowTitle else { return .ignored }
+                        taskToEdit = task
+                        return .handled
+                    }
+                    // Delete (Backspace) → confirm, then delete the selected task.
+                    // `.onDeleteCommand` is the macOS-specific hook for the Delete
+                    // key on a focused list; `.onKeyPress(.delete)` doesn't fire here
+                    // because the List's underlying table view consumes that key.
+                    .onDeleteCommand {
+                        guard let task = selectedTask else { return }
+                        taskToDelete = task
+                    }
+                    // Bind the List into the shared focus system, then claim focus once
+                    // it appears. The `DispatchQueue.main.async` defers the assignment to
+                    // the next runloop tick — setting `@FocusState` during the same
+                    // pass the view is first installed often doesn't take.
+                    .focused($focusedPane, equals: .list)
+                    .onAppear {
+                        DispatchQueue.main.async { focusedPane = .list }
+                    }
+                    // Left-arrow hands focus back to the sidebar — the mirror of the
+                    // sidebar's Right-arrow. The table view consumes Up/Down for row
+                    // selection but leaves Left/Right for `.onKeyPress` to handle.
+                    // Ignored while a row is editing its title inline, so left-arrow
+                    // moves the text cursor instead of stealing focus.
+                    .onKeyPress(.leftArrow) {
+                        guard !isEditingRowTitle else { return .ignored }
+                        focusedPane = .sidebar
+                        return .handled
                     }
 
-                    if showCompleted {
-                        ForEach(completedTasks) { task in
-                            row(for: task)
-                        }
+                    // Swallows clicks in the blank space below the last row by
+                    // sitting visually on top of the List there. AppKit resolves
+                    // a click to whichever view is topmost, so once this overlay
+                    // covers that area, the List's own NSTableView — and its
+                    // default "clear the selection, then try to reselect"
+                    // handling — never sees the click at all. (An earlier
+                    // attempt reacted after the fact instead of pre-empting the
+                    // click, which still produced a visible flicker.) It starts
+                    // exactly at `contentBottom`, so real rows above it are
+                    // untouched and keep working normally.
+                    GeometryReader { geo in
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {}
+                            .frame(height: max(0, geo.size.height - contentBottom))
+                            .offset(y: contentBottom)
                     }
-                }
-                // `.inset` is a list style that shows rows with inset (indented)
-                // separators — a common appearance in macOS detail views.
-                .listStyle(.inset)
-                // Keyboard navigation for the selected row. `.onKeyPress` only
-                // fires while the List holds keyboard focus, so these don't
-                // interfere with typing in the edit sheet or elsewhere. Returning
-                // `.ignored` when nothing is selected lets the keystroke pass
-                // through to its default handling.
-                //
-                // Return → edit the selected task. Ignored while the row is
-                // already editing its title inline, so that Return commits the
-                // inline edit instead of also opening the edit sheet.
-                .onKeyPress(.return) {
-                    guard let task = selectedTask, !isEditingRowTitle else { return .ignored }
-                    taskToEdit = task
-                    return .handled
-                }
-                // Delete (Backspace) → confirm, then delete the selected task.
-                // `.onDeleteCommand` is the macOS-specific hook for the Delete
-                // key on a focused list; `.onKeyPress(.delete)` doesn't fire here
-                // because the List's underlying table view consumes that key.
-                .onDeleteCommand {
-                    guard let task = selectedTask else { return }
-                    taskToDelete = task
-                }
-                // Bind the List into the shared focus system, then claim focus once
-                // it appears. The `DispatchQueue.main.async` defers the assignment to
-                // the next runloop tick — setting `@FocusState` during the same
-                // pass the view is first installed often doesn't take.
-                .focused($focusedPane, equals: .list)
-                .onAppear {
-                    DispatchQueue.main.async { focusedPane = .list }
-                }
-                // Left-arrow hands focus back to the sidebar — the mirror of the
-                // sidebar's Right-arrow. The table view consumes Up/Down for row
-                // selection but leaves Left/Right for `.onKeyPress` to handle.
-                // Ignored while a row is editing its title inline, so left-arrow
-                // moves the text cursor instead of stealing focus.
-                .onKeyPress(.leftArrow) {
-                    guard !isEditingRowTitle else { return .ignored }
-                    focusedPane = .sidebar
-                    return .handled
                 }
             }
         }
@@ -303,5 +355,15 @@ struct TaskListView: View {
         if index + 1 < tasks.count { return tasks[index + 1].id }
         if index - 1 >= 0 { return tasks[index - 1].id }
         return nil
+    }
+}
+
+// Reports the y-position (in the `taskListArea` coordinate space) where the
+// List's real row content ends. Used to size the click-eating overlay to
+// exactly the blank space below the last row.
+private struct ContentBottomKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
