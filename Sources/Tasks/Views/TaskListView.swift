@@ -143,7 +143,10 @@ struct TaskListView: View {
                 // Left-arrow hands focus back to the sidebar — the mirror of the
                 // sidebar's Right-arrow. The table view consumes Up/Down for row
                 // selection but leaves Left/Right for `.onKeyPress` to handle.
+                // Ignored while a row is editing its title inline, so left-arrow
+                // moves the text cursor instead of stealing focus.
                 .onKeyPress(.leftArrow) {
+                    guard !isEditingRowTitle else { return .ignored }
                     focusedPane = .sidebar
                     return .handled
                 }
